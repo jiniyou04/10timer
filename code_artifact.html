@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>알록달록 어린이 테트리스</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Jua&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Jua', 'Gaegu', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background: linear-gradient(135deg, #a8edd9 0%, #fed6e3 100%);
+        }
+        .btn-bounce {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .btn-bounce:active {
+            transform: scale(0.92);
+        }
+        .pulse-glow {
+            animation: pulseGlow 1.8s infinite alternate;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 10px rgba(255,215,0,0.5); transform: scale(1); }
+            100% { box-shadow: 0 0 25px rgba(255,215,0,0.9); transform: scale(1.05); }
+        }
+        .float-anim {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 text-gray-800 overflow-x-hidden">
+
+    <!-- Top Bar -->
+    <header class="w-full max-w-xl bg-white/80 backdrop-blur-md rounded-3xl p-3 shadow-lg border-4 border-white flex justify-between items-center mb-2">
+        <div class="flex items-center gap-2">
+            <span class="text-3xl sm:text-4xl float-anim">🦖</span>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-pink-500 leading-none">말랑말랑 테트리스</h1>
+                <p class="text-xs text-emerald-600 font-bold">어린이 신나는 블록놀이</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button id="soundBtn" onclick="toggleSound()" class="bg-yellow-300 hover:bg-yellow-400 text-yellow-900 font-bold px-3 py-1.5 rounded-2xl shadow border-2 border-yellow-100 flex items-center gap-1 text-sm btn-bounce">
+                <span id="soundIcon">🔊</span> 소리
+            </button>
+            <button id="pauseBtn" onclick="togglePause()" class="bg-purple-300 hover:bg-purple-400 text-purple-900 font-bold px-3 py-1.5 rounded-2xl shadow border-2 border-purple-100 text-sm btn-bounce">
+                ⏸️ 일시정지
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="w-full max-w-xl flex flex-col md:flex-row gap-3 items-center justify-center flex-1">
+        
+        <!-- Side Dashboard (Left/Top) -->
+        <div class="w-full md:w-40 flex md:flex-col justify-between md:justify-start gap-2">
+            <!-- Next Piece Box -->
+            <div class="bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-md border-3 border-pink-200 flex-1 flex flex-col items-center">
+                <span class="text-xs text-pink-500 font-bold mb-1">다음에 나올 블록</span>
+                <canvas id="nextCanvas" width="90" height="90" class="bg-pink-50/50 rounded-xl border border-pink-100"></canvas>
+            </div>
+
+            <!-- Score & Level Box -->
+            <div class="bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-md border-3 border-emerald-200 flex-1 flex flex-col justify-center items-center">
+                <div class="text-center mb-1">
+                    <span class="text-xs text-emerald-600 font-bold block">점수</span>
+                    <span id="scoreText" class="text-2xl font-black text-emerald-500">0</span>
+                </div>
+                <div class="text-center border-t border-emerald-100 pt-1 w-full">
+                    <span class="text-xs text-emerald-600 font-bold block">지운 줄</span>
+                    <span id="linesText" class="text-lg font-bold text-teal-600">0</span>
+                </div>
+            </div>
+
+            <!-- Mascot & Speech -->
+            <div class="hidden md:flex bg-white/80 p-2.5 rounded-2xl shadow border-2 border-sky-200 flex-col items-center text-center">
+                <div id="mascotBubble" class="bg-sky-100 text-sky-800 text-xs font-bold p-2 rounded-xl mb-1 relative w-full">
+                    파이팅! 천천히 해봐!
+                </div>
+                <div class="text-3xl float-anim">🦖</div>
+            </div>
+        </div>
+
+        <!-- Center Game Board Canvas -->
+        <div class="relative bg-white/90 p-2 sm:p-3 rounded-3xl shadow-xl border-4 border-white flex justify-center items-center">
+            <canvas id="gameCanvas" width="260" height="416" class="bg-sky-50/80 rounded-2xl border-2 border-sky-100 shadow-inner block"></canvas>
+            
+            <!-- Magic Bomb Powerup overlay button -->
+            <button id="magicWandBtn" onclick="useMagicWand()" class="absolute top-4 right-4 bg-gradient-to-r from-amber-400 to-pink-500 text-white font-black text-xs px-3 py-2 rounded-2xl shadow-lg border-2 border-white flex items-center gap-1 pulse-glow btn-bounce">
+                <span class="text-base">🪄</span> 요술봉 (3)
+            </button>
+
+            <!-- Pause Overlay -->
+            <div id="pauseOverlay" class="hidden absolute inset-0 bg-black/40 backdrop-blur-xs rounded-3xl flex flex-col items-center justify-center text-white z-20">
+                <span class="text-4xl mb-2">⏸️</span>
+                <p class="text-2xl font-bold mb-4">잠시 쉬는 시간!</p>
+                <button onclick="togglePause()" class="bg-emerald-400 hover:bg-emerald-500 text-white font-bold text-lg px-6 py-2.5 rounded-full shadow-lg border-2 border-white btn-bounce">
+                    ▶️ 다시 시작
+                </button>
+            </div>
+
+            <!-- Game Over / Victory Overlay -->
+            <div id="gameOverOverlay" class="hidden absolute inset-0 bg-pink-500/90 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center text-white p-4 text-center z-30">
+                <span class="text-5xl mb-2 float-anim">🌟</span>
+                <h2 class="text-2xl font-bold mb-1">정말 잘했어요!</h2>
+                <p id="finalScoreText" class="text-lg text-yellow-200 font-bold mb-4">점수: 0점</p>
+                <button onclick="restartGame()" class="bg-yellow-300 hover:bg-yellow-400 text-yellow-900 font-bold text-lg px-6 py-3 rounded-full shadow-lg border-2 border-white btn-bounce">
+                    🔄 한 번 더 놀기!
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- On-screen Kid-friendly Touch Controls -->
+    <footer class="w-full max-w-xl bg-white/80 backdrop-blur-md rounded-3xl p-3 shadow-lg border-4 border-white mt-2">
+        <div class="grid grid-cols-5 gap-2">
+            <button onclick="moveLeft()" class="bg-sky-400 active:bg-sky-500 text-white font-bold py-3.5 rounded-2xl shadow-md border-b-4 border-sky-600 text-2xl flex items-center justify-center btn-bounce">
+                👈
+            </button>
+            <button onclick="rotatePiece()" class="bg-purple-400 active:bg-purple-500 text-white font-bold py-3.5 rounded-2xl shadow-md border-b-4 border-purple-600 text-2xl flex items-center justify-center btn-bounce">
+                🔄
+            </button>
+            <button onclick="moveRight()" class="bg-sky-400 active:bg-sky-500 text-white font-bold py-3.5 rounded-2xl shadow-md border-b-4 border-sky-600 text-2xl flex items-center justify-center btn-bounce">
+                👉
+            </button>
+            <button onclick="softDrop()" class="bg-emerald-400 active:bg-emerald-500 text-white font-bold py-3.5 rounded-2xl shadow-md border-b-4 border-emerald-600 text-2xl flex items-center justify-center btn-bounce">
+                👇
+            </button>
+            <button onclick="hardDrop()" class="bg-pink-400 active:bg-pink-500 text-white font-bold py-3.5 rounded-2xl shadow-md border-b-4 border-pink-600 text-2xl flex items-center justify-center btn-bounce">
+                ⬇️
+            </button>
+        </div>
+        <p class="text-center text-xs text-gray-500 font-bold mt-2">키보드 방향키 [←] [→] [↓] [↑ 회전] [스페이스바 쿵!] 사용 가능</p>
+    </footer>
+
+    <script>
+        // Board settings (Kid friendly 10 x 16 grid for faster rewards)
+        const COLS = 10;
+        const ROWS = 16;
+        const BLOCK_SIZE = 26; // Canvas block size in px
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const nextCanvas = document.getElementById('nextCanvas');
+        const nextCtx = nextCanvas.getContext('2d');
+
+        // Sound state
+        let soundEnabled = true;
+        let synth, polySynth;
+
+        // Init Tone.js audio synthesizers on user interaction
+        function initAudio() {
+            if (!synth && window.Tone) {
+                synth = new Tone.Synth({
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 }
+                }).toDestination();
+                
+                polySynth = new Tone.PolySynth(Tone.Synth).toDestination();
+                polySynth.volume.value = -6;
+            }
+        }
+
+        function playNote(note, duration = "8n") {
+            if (!soundEnabled || !synth) return;
+            try {
+                if (Tone.context.state !== 'running') Tone.start();
+                synth.triggerAttackRelease(note, duration);
+            } catch(e) {}
+        }
+
+        function playLineClearSound() {
+            if (!soundEnabled || !polySynth) return;
+            try {
+                if (Tone.context.state !== 'running') Tone.start();
+                polySynth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "16n");
+            } catch(e) {}
+        }
+
+        function toggleSound() {
+            initAudio();
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundIcon').innerText = soundEnabled ? '🔊' : '🔇';
+        }
+
+        // Color definitions for Tetrominoes (Cute pastel palette)
+        const PIECE_COLORS = {
+            I: { main: '#4ECDC4', light: '#A8F3EF', dark: '#2BB0A7', face: '😊' },
+            J: { main: '#5C9EAD', light: '#98D4E2', dark: '#3B7B8A', face: '😄' },
+            L: { main: '#FFA07A', light: '#FFC8B4', dark: '#E0754C', face: '😃' },
+            O: { main: '#FFE66D', light: '#FFF3B3', dark: '#D4BD3A', face: '🥰' },
+            S: { main: '#77DD77', light: '#B3F5B3', dark: '#4EAF4E', face: '😋' },
+            T: { main: '#B19FF9', light: '#DDD4FF', dark: '#8872DC', face: '😜' },
+            Z: { main: '#FF6B6B', light: '#FFA8A8', dark: '#D94343', face: '😍' }
+        };
+
+        // Tetromino shapes
+        const SHAPES = {
+            I: [[0,0,0,0], [1,1,1,1], [0,0,0,0], [0,0,0,0]],
+            J: [[1,0,0], [1,1,1], [0,0,0]],
+            L: [[0,0,1], [1,1,1], [0,0,0]],
+            O: [[1,1], [1,1]],
+            S: [[0,1,1], [1,1,0], [0,0,0]],
+            T: [[0,1,0], [1,1,1], [0,0,0]],
+            Z: [[1,1,0], [0,1,1], [0,0,0]]
+        };
+
+        const PIECE_KEYS = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+
+        // Game State
+        let board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        let currentPiece = null;
+        let nextPiece = null;
+        let score = 0;
+        let linesCleared = 0;
+        let magicWandsLeft = 3;
+        let isPaused = false;
+        let isGameOver = false;
+        let dropInterval = 1000; // Kid friendly slow default speed
+        let lastDropTime = 0;
+        let animationFrameId = null;
+
+        const mascotPhrases = [
+            "야호! 신난다!",
+            "정말 잘하고 있어!",
+            "차근차근 해봐요!",
+            "알록달록 예쁘다!",
+            "최고야! 멋져요!",
+            "요술봉도 써봐!"
+        ];
+
+        function updateMascot() {
+            const randomMsg = mascotPhrases[Math.floor(Math.random() * mascotPhrases.length)];
+            const bubble = document.getElementById('mascotBubble');
+            if (bubble) bubble.innerText = randomMsg;
+        }
+
+        function createPiece(key) {
+            const type = key || PIECE_KEYS[Math.floor(Math.random() * PIECE_KEYS.length)];
+            const shape = SHAPES[type].map(row => [...row]);
+            return {
+                type: type,
+                shape: shape,
+                x: Math.floor((COLS - shape[0].length) / 2),
+                y: 0,
+                colorInfo: PIECE_COLORS[type]
+            };
+        }
+
+        // Draw individual block with 3D rounded button effect and face
+        function drawBlock(context, x, y, colorInfo, size = BLOCK_SIZE, isGhost = false, isTopBlock = false) {
+            const px = x * size;
+            const py = y * size;
+            const radius = Math.floor(size * 0.25);
+
+            context.save();
+
+            if (isGhost) {
+                context.strokeStyle = colorInfo.main;
+                context.lineWidth = 2;
+                context.setLineDash([4, 4]);
+                context.strokeRect(px + 2, py + 2, size - 4, size - 4);
+                context.restore();
+                return;
+            }
+
+            // Fill Base
+            context.fillStyle = colorInfo.main;
+            context.beginPath();
+            context.roundRect(px + 1, py + 1, size - 2, size - 2, radius);
+            context.fill();
+
+            // Highlight top-left
+            context.fillStyle = colorInfo.light;
+            context.beginPath();
+            context.roundRect(px + 2, py + 2, size - 4, (size - 4) / 2, [radius, radius, 0, 0]);
+            context.fill();
+
+            // Inner border
+            context.strokeStyle = colorInfo.dark;
+            context.lineWidth = 1.5;
+            context.beginPath();
+            context.roundRect(px + 1, py + 1, size - 2, size - 2, radius);
+            context.stroke();
+
+            // Draw cute face on key block
+            if (isTopBlock && size >= 20) {
+                context.fillStyle = '#1e293b';
+                const eyeY = py + size * 0.45;
+                const eye1X = px + size * 0.35;
+                const eye2X = px + size * 0.65;
+                const eyeRadius = Math.max(1.5, size * 0.08);
+
+                // Eyes
+                context.beginPath();
+                context.arc(eye1X, eyeY, eyeRadius, 0, Math.PI * 2);
+                context.arc(eye2X, eyeY, eyeRadius, 0, Math.PI * 2);
+                context.fill();
+
+                // Smile Mouth
+                context.beginPath();
+                context.arc(px + size * 0.5, py + size * 0.52, size * 0.2, 0.1 * Math.PI, 0.9 * Math.PI);
+                context.lineWidth = 1.5;
+                context.strokeStyle = '#1e293b';
+                context.stroke();
+            }
+
+            context.restore();
+        }
+
+        function collide(boardState, piece, offsetX = 0, offsetY = 0, testShape = null) {
+            const shape = testShape || piece.shape;
+            for (let r = 0; r < shape.length; r++) {
+                for (let c = 0; c < shape[r].length; c++) {
+                    if (shape[r][c]) {
+                        const newX = piece.x + c + offsetX;
+                        const newY = piece.y + r + offsetY;
+
+                        if (newX < 0 || newX >= COLS || newY >= ROWS) {
+                            return true; // Wall or floor collision
+                        }
+                        if (newY >= 0 && boardState[newY][newX] !== null) {
+                            return true; // Collide with settled blocks
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function mergePiece() {
+            let firstBlock = true;
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c]) {
+                        const boardY = currentPiece.y + r;
+                        const boardX = currentPiece.x + c;
+                        if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
+                            board[boardY][boardX] = {
+                                colorInfo: currentPiece.colorInfo,
+                                isTop: firstBlock
+                            };
+                            firstBlock = false;
+                        }
+                    }
+                }
+            }
+            playNote("G4", "16n");
+            checkLines();
+        }
+
+        // Clear completed lines with reward effects
+        function checkLines() {
+            let clearedCount = 0;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r].every(cell => cell !== null)) {
+                    board.splice(r, 1);
+                    board.unshift(Array(COLS).fill(null));
+                    clearedCount++;
+                    r++; // Re-check current row index
+                }
+            }
+
+            if (clearedCount > 0) {
+                linesCleared += clearedCount;
+                score += clearedCount * 100 + (clearedCount > 1 ? clearedCount * 50 : 0);
+                
+                document.getElementById('scoreText').innerText = score;
+                document.getElementById('linesText').innerText = linesCleared;
+
+                playLineClearSound();
+                updateMascot();
+
+                // Launch colorful confetti on double/triple/tetris clear
+                if (typeof confetti === 'function') {
+                    confetti({
+                        particleCount: clearedCount * 25,
+                        spread: 60,
+                        origin: { y: 0.7 }
+                    });
+                }
+            }
+        }
+
+        // Calculate ghost piece drop position
+        function getGhostY() {
+            let ghostY = currentPiece.y;
+            while (!collide(board, currentPiece, 0, ghostY - currentPiece.y + 1)) {
+                ghostY++;
+            }
+            return ghostY;
+        }
+
+        function drawNextPiece() {
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+            if (!nextPiece) return;
+
+            const size = 18;
+            const shape = nextPiece.shape;
+            const offsetX = Math.floor((nextCanvas.width - shape[0].length * size) / 2);
+            const offsetY = Math.floor((nextCanvas.height - shape.length * size) / 2);
+
+            let isFirst = true;
+            for (let r = 0; r < shape.length; r++) {
+                for (let c = 0; c < shape[r].length; c++) {
+                    if (shape[r][c]) {
+                        drawBlockPreview(nextCtx, offsetX + c * size, offsetY + r * size, nextPiece.colorInfo, size, isFirst);
+                        isFirst = false;
+                    }
+                }
+            }
+        }
+
+        function drawBlockPreview(ctx, px, py, colorInfo, size, isTop) {
+            const radius = 4;
+            ctx.fillStyle = colorInfo.main;
+            ctx.beginPath();
+            ctx.roundRect(px, py, size - 1, size - 1, radius);
+            ctx.fill();
+
+            if (isTop) {
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.arc(px + size * 0.35, py + size * 0.4, 1.5, 0, Math.PI * 2);
+                ctx.arc(px + size * 0.65, py + size * 0.4, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Grid lines (Subtle)
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 0.5;
+            for (let r = 0; r <= ROWS; r++) {
+                ctx.beginPath();
+                ctx.moveTo(0, r * BLOCK_SIZE);
+                ctx.lineTo(COLS * BLOCK_SIZE, r * BLOCK_SIZE);
+                ctx.stroke();
+            }
+            for (let c = 0; c <= COLS; c++) {
+                ctx.beginPath();
+                ctx.moveTo(c * BLOCK_SIZE, 0);
+                ctx.lineTo(c * BLOCK_SIZE, ROWS * BLOCK_SIZE);
+                ctx.stroke();
+            }
+
+            // 2. Draw Settled Board Blocks
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c] !== null) {
+                        drawBlock(ctx, c, r, board[r][c].colorInfo, BLOCK_SIZE, false, board[r][c].isTop);
+                    }
+                }
+            }
+
+            // 3. Draw Active Piece & Ghost Shadow
+            if (currentPiece && !isGameOver) {
+                const ghostY = getGhostY();
+
+                // Draw Ghost
+                for (let r = 0; r < currentPiece.shape.length; r++) {
+                    for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                        if (currentPiece.shape[r][c]) {
+                            drawBlock(ctx, currentPiece.x + c, ghostY + r, currentPiece.colorInfo, BLOCK_SIZE, true);
+                        }
+                    }
+                }
+
+                // Draw Active Falling Piece
+                let isFirstBlock = true;
+                for (let r = 0; r < currentPiece.shape.length; r++) {
+                    for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                        if (currentPiece.shape[r][c]) {
+                            drawBlock(ctx, currentPiece.x + c, currentPiece.y + r, currentPiece.colorInfo, BLOCK_SIZE, false, isFirstBlock);
+                            isFirstBlock = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        function moveLeft() {
+            initAudio();
+            if (isPaused || isGameOver || !currentPiece) return;
+            if (!collide(board, currentPiece, -1, 0)) {
+                currentPiece.x--;
+                playNote("C4", "32n");
+                draw();
+            }
+        }
+
+        function moveRight() {
+            initAudio();
+            if (isPaused || isGameOver || !currentPiece) return;
+            if (!collide(board, currentPiece, 1, 0)) {
+                currentPiece.x++;
+                playNote("E4", "32n");
+                draw();
+            }
+        }
+
+        function rotatePiece() {
+            initAudio();
+            if (isPaused || isGameOver || !currentPiece) return;
+
+            const shape = currentPiece.shape;
+            const N = shape.length;
+            // Matrix rotation (Clockwise)
+            const rotated = shape.map((val, index) =>
+                shape.map(row => row[index]).reverse()
+            );
+
+            // Wall kick tests
+            let offset = 0;
+            if (!collide(board, currentPiece, 0, 0, rotated)) {
+                currentPiece.shape = rotated;
+                playNote("A4", "16n");
+            } else if (!collide(board, currentPiece, -1, 0, rotated)) {
+                currentPiece.x--;
+                currentPiece.shape = rotated;
+                playNote("A4", "16n");
+            } else if (!collide(board, currentPiece, 1, 0, rotated)) {
+                currentPiece.x++;
+                currentPiece.shape = rotated;
+                playNote("A4", "16n");
+            }
+            draw();
+        }
+
+        function softDrop() {
+            initAudio();
+            if (isPaused || isGameOver || !currentPiece) return;
+            if (!collide(board, currentPiece, 0, 1)) {
+                currentPiece.y++;
+                score += 1;
+                document.getElementById('scoreText').innerText = score;
+                draw();
+            } else {
+                mergePiece();
+                spawnPiece();
+            }
+        }
+
+        function hardDrop() {
+            initAudio();
+            if (isPaused || isGameOver || !currentPiece) return;
+            while (!collide(board, currentPiece, 0, 1)) {
+                currentPiece.y++;
+                score += 2;
+            }
+            document.getElementById('scoreText').innerText = score;
+            mergePiece();
+            spawnPiece();
+            draw();
+        }
+
+        // Special Kid Powerup: Clears bottom 3 rows!
+        function useMagicWand() {
+            initAudio();
+            if (isPaused || isGameOver || magicWandsLeft <= 0) return;
+
+            magicWandsLeft--;
+            document.getElementById('magicWandBtn').innerText = `🪄 요술봉 (${magicWandsLeft})`;
+            if (magicWandsLeft === 0) {
+                document.getElementById('magicWandBtn').classList.add('opacity-50');
+            }
+
+            // Remove bottom 3 rows
+            board.splice(ROWS - 3, 3);
+            for (let i = 0; i < 3; i++) {
+                board.unshift(Array(COLS).fill(null));
+            }
+
+            score += 300;
+            document.getElementById('scoreText').innerText = score;
+            playLineClearSound();
+
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 50, spread: 80, origin: { y: 0.5 } });
+            }
+
+            draw();
+        }
+
+        function spawnPiece() {
+            currentPiece = nextPiece || createPiece();
+            nextPiece = createPiece();
+            drawNextPiece();
+
+            // Check Game Over condition
+            if (collide(board, currentPiece, 0, 0)) {
+                triggerGameOver();
+            }
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            document.getElementById('finalScoreText').innerText = `최종 점수: ${score}점`;
+            document.getElementById('gameOverOverlay').classList.remove('hidden');
+            playNote("C3", "4n");
+        }
+
+        function togglePause() {
+            if (isGameOver) return;
+            isPaused = !isPaused;
+            const pauseOverlay = document.getElementById('pauseOverlay');
+            if (isPaused) {
+                pauseOverlay.classList.remove('hidden');
+            } else {
+                pauseOverlay.classList.add('hidden');
+                lastDropTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function restartGame() {
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+            score = 0;
+            linesCleared = 0;
+            magicWandsLeft = 3;
+            isGameOver = false;
+            isPaused = false;
+
+            document.getElementById('scoreText').innerText = '0';
+            document.getElementById('linesText').innerText = '0';
+            document.getElementById('magicWandBtn').innerText = '🪄 요술봉 (3)';
+            document.getElementById('magicWandBtn').classList.remove('opacity-50');
+            document.getElementById('gameOverOverlay').classList.add('hidden');
+            document.getElementById('pauseOverlay').classList.add('hidden');
+
+            nextPiece = createPiece();
+            spawnPiece();
+            lastDropTime = performance.now();
+            draw();
+        }
+
+        function gameLoop(time = 0) {
+            if (isPaused || isGameOver) return;
+
+            const deltaTime = time - lastDropTime;
+            if (deltaTime > dropInterval) {
+                softDrop();
+                lastDropTime = time;
+            }
+
+            draw();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Keyboard Controls
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            if (isGameOver) return;
+
+            switch (e.key) {
+                case 'ArrowLeft': moveLeft(); break;
+                case 'ArrowRight': moveRight(); break;
+                case 'ArrowUp': rotatePiece(); break;
+                case 'ArrowDown': softDrop(); break;
+                case ' ': hardDrop(); break;
+                case 'p': case 'P': togglePause(); break;
+            }
+        });
+
+        // Start Game on Page Load
+        window.onload = function() {
+            restartGame();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
