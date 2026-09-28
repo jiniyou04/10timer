@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10초 타이머</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.05s linear;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        @keyframes pulse-subtle {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 1s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+
+    <!-- Background Glow FX -->
+    <div id="glowBg" class="absolute w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl -z-10 transition-all duration-500"></div>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-md bg-slate-800/80 backdrop-blur-xl border border-slate-700/60 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center relative z-10">
+        
+        <!-- Header -->
+        <header class="w-full flex justify-between items-center mb-6">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">⏱️</span>
+                <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-pink-400 bg-clip-text text-transparent">10초 타이머</h1>
+            </div>
+            <button id="soundToggleBtn" onclick="toggleSound()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border border-slate-600">
+                <span id="soundIcon">🔊</span>
+                <span id="soundLabel">소리 ON</span>
+            </button>
+        </header>
+
+        <!-- Circular Timer Container -->
+        <div class="relative my-4 flex items-center justify-center">
+            <svg class="w-64 h-64 sm:w-72 sm:h-72">
+                <!-- Background track -->
+                <circle
+                    class="text-slate-700/50"
+                    stroke-width="12"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r="110"
+                    cx="50%"
+                    cy="50%"
+                />
+                <!-- Progress ring -->
+                <circle
+                    id="progressCircle"
+                    class="progress-ring__circle text-indigo-500"
+                    stroke-width="12"
+                    stroke-linecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r="110"
+                    cx="50%"
+                    cy="50%"
+                />
+            </svg>
+
+            <!-- Center Digital Display -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <div id="timeDisplay" class="text-5xl sm:text-6xl font-black tracking-tight font-mono text-white">
+                    10.0<span class="text-2xl sm:text-3xl text-indigo-400 font-semibold">초</span>
+                </div>
+                <div id="statusBadge" class="mt-2 px-3 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 text-xs font-medium">
+                    준비됨
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Preset Selection -->
+        <div class="flex gap-2 mb-6 w-full justify-center">
+            <button onclick="setDuration(3)" class="preset-btn px-3 py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-600/50">3초</button>
+            <button onclick="setDuration(5)" class="preset-btn px-3 py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-600/50">5초</button>
+            <button onclick="setDuration(10)" class="preset-btn active-preset px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-xl transition border border-indigo-400">10초</button>
+            <button onclick="setDuration(15)" class="preset-btn px-3 py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-600/50">15초</button>
+            <button onclick="setDuration(30)" class="preset-btn px-3 py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-600/50">30초</button>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="flex items-center gap-3 w-full">
+            <button id="resetBtn" onclick="resetTimer()" class="flex-1 py-3.5 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 font-bold rounded-2xl transition border border-slate-600 flex items-center justify-center gap-2">
+                <span>🔄</span> 초기화
+            </button>
+            <button id="startBtn" onclick="toggleTimer()" class="flex-[2] py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 active:scale-95 text-white font-extrabold text-lg rounded-2xl shadow-lg shadow-indigo-500/25 transition flex items-center justify-center gap-2">
+                <span id="startIcon">▶️</span> <span id="startText">시작</span>
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Footer note -->
+    <footer class="mt-6 text-slate-500 text-xs text-center">
+        스페이스바를 눌러 타이머를 시작/일시정지할 수 있습니다.
+    </footer>
+
+    <!-- Script Logic -->
+    <script>
+        // Timer Variables
+        let totalDuration = 10; // Total time in seconds
+        let timeRemaining = totalDuration; // Remaining time in seconds
+        let timerInterval = null;
+        let isRunning = false;
+        let isMuted = false;
+        let audioCtx = null;
+
+        // SVG Progress Ring setup
+        const circle = document.getElementById('progressCircle');
+        const radius = circle.r.baseVal.value;
+        const circumference = 2 * Math.PI * radius;
+
+        circle.style.strokeDasharray = `${circumference} ${circumference}`;
+        circle.style.strokeDashoffset = 0;
+
+        // Audio synthesizer using Web Audio API
+        function playBeep(freq = 440, type = 'sine', duration = 0.1) {
+            if (isMuted) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function setProgress(percent) {
+            const offset = circumference - (percent / 100) * circumference;
+            circle.style.strokeDashoffset = offset;
+        }
+
+        function updateDisplay() {
+            const timeDisplay = document.getElementById('timeDisplay');
+            const formattedTime = Math.max(0, timeRemaining).toFixed(1);
+            timeDisplay.innerHTML = `${formattedTime}<span class="text-2xl sm:text-3xl text-indigo-400 font-semibold">초</span>`;
+
+            // Progress percentage (100% to 0%)
+            const percent = (timeRemaining / totalDuration) * 100;
+            setProgress(percent);
+
+            // Dynamic color warnings
+            const glowBg = document.getElementById('glowBg');
+            if (timeRemaining <= 3 && timeRemaining > 0) {
+                circle.classList.remove('text-indigo-500', 'text-amber-500');
+                circle.classList.add('text-rose-500');
+                glowBg.className = 'absolute w-96 h-96 bg-rose-600/30 rounded-full blur-3xl -z-10 transition-all duration-500';
+            } else if (timeRemaining <= 5) {
+                circle.classList.remove('text-indigo-500', 'text-rose-500');
+                circle.classList.add('text-amber-500');
+                glowBg.className = 'absolute w-96 h-96 bg-amber-600/20 rounded-full blur-3xl -z-10 transition-all duration-500';
+            } else {
+                circle.classList.remove('text-amber-500', 'text-rose-500');
+                circle.classList.add('text-indigo-500');
+                glowBg.className = 'absolute w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl -z-10 transition-all duration-500';
+            }
+        }
+
+        function toggleTimer() {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            if (timeRemaining <= 0) {
+                resetTimer();
+            }
+
+            isRunning = true;
+            document.getElementById('startIcon').innerText = '⏸️';
+            document.getElementById('startText').innerText = '일시정지';
+            document.getElementById('startBtn').className = 'flex-[2] py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 active:scale-95 text-white font-extrabold text-lg rounded-2xl shadow-lg shadow-amber-500/25 transition flex items-center justify-center gap-2';
+            
+            const badge = document.getElementById('statusBadge');
+            badge.innerText = '카운트다운 중...';
+            badge.className = 'mt-2 px-3 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800/50 text-xs font-medium animate-pulse-subtle';
+
+            playBeep(600, 'sine', 0.1);
+
+            const startTime = Date.now() - (totalDuration - timeRemaining) * 1000;
+            
+            timerInterval = setInterval(() => {
+                const elapsedSeconds = (Date.now() startTime) / 1000;
+                timeRemaining = totalDuration - elapsedSeconds;
+
+                // Ticking audio cue for last 3 seconds
+                if (Math.ceil(timeRemaining) <= 3 && Math.ceil(timeRemaining) > 0) {
+                    const currentSec = Math.ceil(timeRemaining);
+                    if (!this.lastTickSec || this.lastTickSec !== currentSec) {
+                        this.lastTickSec = currentSec;
+                        playBeep(880, 'square', 0.08);
+                    }
+                }
+
+                if (timeRemaining <= 0) {
+                    timeRemaining = 0;
+                    completeTimer();
+                }
+                updateDisplay();
+            }, 50);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            document.getElementById('startIcon').innerText = '▶️';
+            document.getElementById('startText').innerText = '계속';
+            document.getElementById('startBtn').className = 'flex-[2] py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 active:scale-95 text-white font-extrabold text-lg rounded-2xl shadow-lg shadow-indigo-500/25 transition flex items-center justify-center gap-2';
+
+            const badge = document.getElementById('statusBadge');
+            badge.innerText = '일시정지됨';
+            badge.className = 'mt-2 px-3 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/50 text-xs font-medium';
+
+            playBeep(400, 'sine', 0.1);
+        }
+
+        function completeTimer() {
+            pauseTimer();
+            document.getElementById('startText').innerText = '다시 시작';
+
+            const badge = document.getElementById('statusBadge');
+            badge.innerText = '🎉 시간 종료!';
+            badge.className = 'mt-2 px-3 py-0.5 rounded-full bg-pink-950/80 text-pink-300 border border-pink-800/50 text-xs font-semibold animate-bounce';
+
+            // Play finish chime
+            playBeep(523.25, 'triangle', 0.2); // C5
+            setTimeout(() => playBeep(659.25, 'triangle', 0.2), 150); // E5
+            setTimeout(() => playBeep(783.99, 'triangle', 0.4), 300); // G5
+
+            // Trigger confetti
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 80,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            timeRemaining = totalDuration;
+            this.lastTickSec = null;
+
+            document.getElementById('startIcon').innerText = '▶️';
+            document.getElementById('startText').innerText = '시작';
+            document.getElementById('startBtn').className = 'flex-[2] py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 active:scale-95 text-white font-extrabold text-lg rounded-2xl shadow-lg shadow-indigo-500/25 transition flex items-center justify-center gap-2';
+
+            const badge = document.getElementById('statusBadge');
+            badge.innerText = '준비됨';
+            badge.className = 'mt-2 px-3 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 text-xs font-medium';
+
+            updateDisplay();
+        }
+
+        function setDuration(sec) {
+            totalDuration = sec;
+            
+            // Highlight active preset button
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                if (btn.innerText === `${sec}초`) {
+                    btn.className = 'preset-btn active-preset px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-xl transition border border-indigo-400';
+                } else {
+                    btn.className = 'preset-btn px-3 py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition border border-slate-600/50';
+                }
+            });
+
+            resetTimer();
+        }
+
+        function toggleSound() {
+            isMuted = !isMuted;
+            document.getElementById('soundIcon').innerText = isMuted ? '🔇' : '🔊';
+            document.getElementById('soundLabel').innerText = isMuted ? '소리 OFF' : '소리 ON';
+        }
+
+        // Keyboard navigation (Spacebar shortcut)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                toggleTimer();
+            }
+        });
+
+        // Initialize display on load
+        updateDisplay();
+    </script>
+</body>
+</html>
